@@ -1,0 +1,7 @@
+{
+  "slug": "ehs-new-tab",
+  "targets": {
+    "chrome": { "manifest": "manifest_chrome.json" },
+    "firefox": { "manifest": "manifest.json" }
+  }
+}

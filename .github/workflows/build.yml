@@ -1,0 +1,116 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  SLUG: ehs-new-tab
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: stage firefox
+        run: |
+          mkdir -p dist/firefox
+          rsync -a \
+            --exclude='.git' \
+            --exclude='.github' \
+            --exclude='dist' \
+            --exclude='manifest_chrome.json' \
+            --exclude='build.json' \
+            --exclude='.gitignore' \
+            ./ dist/firefox/
+          printf 'globalThis.EH_BROWSER_SEARCH = false;\n' > dist/firefox/js/build-config.js
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+            jq --arg v "$VERSION" '.version = $v' dist/firefox/manifest.json > dist/firefox/manifest.tmp
+            mv dist/firefox/manifest.tmp dist/firefox/manifest.json
+          fi
+
+      - name: zip firefox
+        run: |
+          VERSION=$(jq -r '.version' dist/firefox/manifest.json)
+          cd dist/firefox
+          zip -r "../${SLUG}-firefox-${VERSION}.zip" .
+          cd ../..
+
+      - name: sign firefox
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          WEB_EXT_API_KEY: ${{ secrets.WEB_EXT_API_KEY }}
+          WEB_EXT_API_SECRET: ${{ secrets.WEB_EXT_API_SECRET }}
+        run: |
+          if [[ -z "$WEB_EXT_API_KEY" || -z "$WEB_EXT_API_SECRET" ]]; then
+            echo "missing WEB_EXT_API_KEY / WEB_EXT_API_SECRET repo secrets" >&2
+            exit 1
+          fi
+          mkdir -p dist/signed
+          npx --yes web-ext@latest sign \
+            --source-dir dist/firefox \
+            --artifacts-dir dist/signed \
+            --channel unlisted \
+            --api-key "$WEB_EXT_API_KEY" \
+            --api-secret "$WEB_EXT_API_SECRET" \
+            --no-input
+          VERSION=$(jq -r '.version' dist/firefox/manifest.json)
+          mv dist/signed/*.xpi "dist/${SLUG}-firefox-${VERSION}.xpi"
+
+      - name: build chrome variants
+        run: |
+          for variant in forced unlocked; do
+            target="dist/chrome-${variant}"
+            mkdir -p "$target"
+            rsync -a \
+              --exclude='.git' \
+              --exclude='.github' \
+              --exclude='dist' \
+              --exclude='manifest.json' \
+              --exclude='manifest_chrome.json' \
+              --exclude='build.json' \
+              --exclude='.gitignore' \
+              ./ "$target/"
+            cp manifest_chrome.json "$target/manifest.json"
+            if [[ "$variant" == "forced" ]]; then
+              flag=true
+            else
+              flag=false
+            fi
+            printf 'globalThis.EH_BROWSER_SEARCH = %s;\n' "$flag" > "$target/js/build-config.js"
+            if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+              VERSION="${GITHUB_REF_NAME#v}"
+              jq --arg v "$VERSION" '.version = $v' "$target/manifest.json" > "$target/manifest.tmp"
+              mv "$target/manifest.tmp" "$target/manifest.json"
+            fi
+            VERSION=$(jq -r '.version' "$target/manifest.json")
+            cd "$target"
+            zip -r "../${SLUG}-chrome-${VERSION}-${variant}.zip" .
+            cd ../..
+          done
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.SLUG }}
+          path: |
+            dist/*.zip
+            dist/*.xpi
+          if-no-files-found: warn
+
+      - uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/v')
+        with:
+          files: |
+            dist/*.zip
+            dist/*.xpi

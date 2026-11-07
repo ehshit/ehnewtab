@@ -1,0 +1,36 @@
+{
+  "manifest_version": 3,
+  "name": "Eh's New Tab",
+  "version": "1.0.2",
+  "description": "Just a New Tab experience, simple, and nothing else",
+  "icons": {
+    "16": "img/broicon.png",
+    "32": "img/broicon.png",
+    "48": "img/broicon.png",
+    "128": "img/broicon.png"
+  },
+  "chrome_url_overrides": {
+    "newtab": "newtab.html"
+  },
+  "background": {
+    "service_worker": "js/background.js"
+  },
+  "permissions": [
+    "search",
+    "storage",
+    "unlimitedStorage",
+    "declarativeNetRequestWithHostAccess"
+  ],
+  "host_permissions": [
+    "https://www.reddit.com/*",
+    "https://old.reddit.com/*",
+    "https://oauth.reddit.com/*",
+    "https://i.redd.it/*",
+    "https://preview.redd.it/*",
+    "https://external-preview.redd.it/*",
+    "https://safebooru.org/*"
+  ],
+  "optional_host_permissions": [
+    "https://*/*"
+  ]
+}

@@ -1,0 +1,1 @@
+globalThis.EH_BROWSER_SEARCH = false;

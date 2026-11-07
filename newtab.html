@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="eh">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>New Tab</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="bg" class="bg" aria-hidden="true"></div>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="#"><span class="br">[</span><span class="brand-text">Eh's New Tab</span><span class="br">]</span></a>
+      <nav class="topnav" aria-label="actions">
+        <button id="fetchWallpapers" class="navlink" type="button" title="fetch wallpapers"><span class="br">[</span>fetch<span class="br">]</span></button>
+        <button id="shuffle" class="navlink" type="button" title="new wallpaper"><span class="br">[</span>shuffle<span class="br">]</span></button>
+        <button id="openSettings" class="navlink" type="button" title="settings"><span class="br">[</span>settings<span class="br">]</span></button>
+      </nav>
+    </div>
+  </header>
+
+  <main class="shell">
+    <section class="hero">
+      <div class="clock-block">
+        <time id="clock" class="clock" aria-label="time">--:--</time>
+        <div id="date" class="date"></div>
+      </div>
+    </section>
+
+    <form id="searchForm" class="search" role="search">
+      <div class="engine-wrap">
+        <span id="engineDisplay" class="engine-display" aria-hidden="true"></span>
+        <select id="engine" class="engine" aria-label="search engine"></select>
+      </div>
+      <input id="q" class="q" type="text" autocomplete="off" spellcheck="false" placeholder="Search with DuckDuckGo" aria-label="search">
+      <button class="go" type="submit" aria-label="search">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>
+      </button>
+    </form>
+
+    <div id="attr" class="attr" hidden></div>
+  </main>
+
+  <div id="overlay" class="overlay" hidden></div>
+
+  <aside id="settings" class="settings" aria-hidden="true" aria-label="settings">
+    <header>
+      <h2>settings</h2>
+      <button id="closeSettings" class="icon-btn small" aria-label="close settings">✕</button>
+    </header>
+
+    <div class="settings-tabs" role="tablist" aria-label="settings sections">
+      <button class="settings-tab active" type="button" data-settings-tab="look" role="tab" aria-selected="true">background &amp; look</button>
+      <button class="settings-tab" type="button" data-settings-tab="engine" role="tab" aria-selected="false">search engine</button>
+      <button class="settings-tab" type="button" data-settings-tab="doodles" role="tab" aria-selected="false">doodles</button>
+    </div>
+
+    <div id="tab-look" class="settings-pane show" role="tabpanel">
+      <section>
+        <h3>background service</h3>
+        <div class="segmented" role="tablist" aria-label="background source">
+          <button type="button" class="seg" data-src="reddit">reddit</button>
+          <button type="button" class="seg" data-src="safebooru">safebooru</button>
+          <button type="button" class="seg" data-src="url">url</button>
+          <button type="button" class="seg" data-src="upload">upload</button>
+        </div>
+
+        <div id="panel-reddit" class="panel-treatment">
+          <label>subreddit
+            <input id="subreddit" type="text" value="Animewallpaper" autocomplete="off" spellcheck="false">
+          </label>
+          <label>query / flair
+            <input id="query" type="text" value='flair:&quot;Desktop&quot;' autocomplete="off" spellcheck="false">
+          </label>
+          <div class="row">
+            <label>sort
+              <select id="sort">
+                <option value="top">top</option>
+                <option value="hot">hot</option>
+                <option value="new">new</option>
+              </select>
+            </label>
+            <label>time
+              <select id="time">
+                <option value="hour">hour</option>
+                <option value="day">day</option>
+                <option value="week">week</option>
+                <option value="month">month</option>
+                <option value="year">year</option>
+                <option value="all">all</option>
+              </select>
+            </label>
+          </div>
+          <label class="check"><input id="nsfw" type="checkbox"> include nsfw</label>
+          <label>reddit app id <span class="mini">(optional)</span>
+            <input id="redditClientId" type="text" placeholder="paste installed-app id" autocomplete="off" spellcheck="false">
+          </label>
+          <p class="hint">reddit blocking the pond? make an <a href="https://www.reddit.com/prefs/apps" target="_blank" rel="noreferrer">installed app</a> and paste its id above.</p>
+
+          <label class="check"><input id="useRedlib" type="checkbox"> use redlib instance</label>
+          <div id="redlibFields" class="sub-fields">
+            <label>instance url
+              <input id="redlibUrl" type="url" placeholder="https://redlib.example" autocomplete="off" spellcheck="false">
+            </label>
+            <p id="redlibStatus" class="hint">redlib searches are parsed from the instance search page.</p>
+          </div>
+        </div>
+
+        <div id="panel-safebooru" class="panel-treatment">
+          <label>tags
+            <input id="safebooruTags" type="text" value="sort:score:desc" autocomplete="off" spellcheck="false">
+          </label>
+          <p class="hint">space separated, try <code>landscape</code>, <code>sentry</code> or <code>sort:score:desc</code>!</p>
+        </div>
+
+        <div id="panel-url" class="panel-treatment">
+          <label>image url
+            <input id="bgUrl" type="url" placeholder="https://..." autocomplete="off" spellcheck="false">
+          </label>
+        </div>
+
+        <div id="panel-upload" class="panel-treatment">
+          <label>image file
+            <input id="bgUpload" type="file" accept="image/*">
+          </label>
+          <button id="removeUpload" class="btn ghost" type="button">remove uploaded image</button>
+          <p id="uploadInfo" class="hint"></p>
+        </div>
+
+        <div id="fetchRow" class="fetch-row">
+          <button id="tryFetch" class="btn" type="button">fetch wallpapers now</button>
+          <p id="poolInfo" class="hint"></p>
+        </div>
+      </section>
+
+      <section>
+        <h3>theme</h3>
+        <div class="segmented" role="tablist" aria-label="theme">
+          <button type="button" class="seg" data-theme-choice="eh">ehis.gay</button>
+          <button type="button" class="seg" data-theme-choice="material2">material 2</button>
+          <button type="button" class="seg" data-theme-choice="custom">custom css</button>
+        </div>
+        <div id="customWrap" class="custom-wrap">
+          <label>custom css
+            <textarea id="customCss" spellcheck="false" placeholder=":root {&#10;  --pink: #f2c6de;&#10;}"></textarea>
+          </label>
+          <details class="help">
+            <summary>how to write it</summary>
+            <p>anything that you write here will apply, any css is also saved as a backup, the root is <code>html[data-theme="custom"]</code>.</p>
+            <pre>html[data-theme="custom"] .clock { color: var(--pink); }
+.hero { gap: 2rem; }
+.search { border-color: var(--pink-mid); }
+:root { --dim: 0.55; }</pre>
+            <p><code>variables:</code> --text, --text-dim, --text-muted, --bg, --bg-alt, --border, --border-hi, --pink, --pink-mid, --blue, --mint, --purple, --yellow, --cream, --font-syne, --font-mono, --radius, --radius-sm, --scrim-rgb</p>
+            <p><code>classes:</code> .topbar .brand .navlink .shell .hero .clock-block .clock .date .search .engine .engine-display .q .go .attr .settings .settings-tab .settings-pane .panel-treatment .seg .btn .hint .toast</p>
+            <p>search position is exposed as <code>html[data-search-pos="center"]</code> or <code>html[data-search-pos="non-center"]</code>; clock position as <code>html[data-clock-pos="center"]</code> or <code>html[data-clock-pos="non-center"]</code>; box position as <code>html[data-hero-pos="center"]</code> or <code>html[data-hero-pos="non-center"]</code>.</p>
+          </details>
+        </div>
+      </section>
+
+      <section>
+        <h3>look</h3>
+        <label>
+          <span class="range-head"><span>dim</span><span id="dimVal">42%</span></span>
+          <input id="dim" type="range" min="0" max="80" step="1">
+        </label>
+        <label>
+          <span class="range-head"><span>blur</span><span id="blurVal">0px</span></span>
+          <input id="blur" type="range" min="0" max="24" step="1">
+        </label>
+
+        <div id="searchPosWrap" class="search-pos-wrap">
+          <h3>search position</h3>
+          <div class="segmented" role="tablist" aria-label="search position">
+            <button type="button" class="seg" data-search-pos="center">center</button>
+            <button type="button" class="seg" data-search-pos="non-center">non-center</button>
+          </div>
+        </div>
+
+        <div id="clockPosWrap" class="search-pos-wrap">
+          <h3>clock position</h3>
+          <div class="segmented" role="tablist" aria-label="clock position">
+            <button type="button" class="seg" data-clock-pos="center">center</button>
+            <button type="button" class="seg" data-clock-pos="non-center">non-center</button>
+          </div>
+        </div>
+
+        <div id="heroPosWrap" class="search-pos-wrap">
+          <h3>box position</h3>
+          <div class="segmented" role="tablist" aria-label="box position">
+            <button type="button" class="seg" data-hero-pos="center">center</button>
+            <button type="button" class="seg" data-hero-pos="non-center">non-center</button>
+          </div>
+          <p class="hint">material 2 and custom css only.</p>
+        </div>
+
+        <label class="check"><input id="clock24" type="checkbox"> use 24 hour format</label>
+      </section>
+
+      <section>
+        <h3>backup</h3>
+        <div class="fetch-row">
+          <button id="exportSettings" class="btn" type="button">export settings</button>
+          <button id="importSettings" class="btn" type="button">import settings</button>
+        </div>
+        <input id="importSettingsFile" type="file" accept="application/json,.json" hidden>
+        <p class="hint">json only, your wallpapers are not stored (except for any URLs).</p>
+      </section>
+    </div>
+
+    <div id="tab-engine" class="settings-pane" role="tabpanel">
+      <section id="engineLocked" hidden>
+        <h3>search engine</h3>
+        <p class="hint">Sorry, the search engines are managed by your browser's settings!</p>
+      </section>
+
+      <section>
+        <h3>search engine</h3>
+        <label>engine
+          <select id="engineSetting"></select>
+        </label>
+      </section>
+
+      <section>
+        <h3>add your own</h3>
+        <div class="engine-add">
+          <label>name
+            <input id="engineName" type="text" placeholder="my search" autocomplete="off" spellcheck="false">
+          </label>
+          <label>short
+            <input id="engineShort" type="text" placeholder="mine" maxlength="12" autocomplete="off" spellcheck="false">
+          </label>
+        </div>
+        <label>url
+          <input id="engineUrl" type="url" placeholder="https://example.com/search?q=%s" autocomplete="off" spellcheck="false">
+        </label>
+        <button id="addEngine" class="btn" type="button">add engine</button>
+        <p class="hint">use <code>%s</code> where the search goes, also short is what it shows in your search bar.</p>
+        <div id="engineList" class="engine-list"></div>
+      </section>
+    </div>
+
+    <div id="tab-doodles" class="settings-pane" role="tabpanel">
+      <section>
+        <h3>doodles</h3>
+        <label class="check"><input id="doodlesOn" type="checkbox"> activate seasonal doodles</label>
+        <label>what doodle to be
+          <select id="doodlePick"></select>
+        </label>
+        <label id="doodleDateWrap" hidden>simulated date
+          <select id="doodleDate"></select>
+        </label>
+        <p class="hint">setting to Auto (by date) will follow your system's calendar</p>
+      </section>
+    </div>
+
+    <footer>
+      <span id="saveState" class="hint">saved</span>
+    </footer>
+  </aside>
+
+  <div id="toast" class="toast" role="status" hidden></div>
+
+  <script src="js/build-config.js"></script>
+  <script src="js/doodles.js"></script>
+  <script src="js/newtab.js"></script>
+</body>
+</html>
