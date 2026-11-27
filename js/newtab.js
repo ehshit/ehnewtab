@@ -57,6 +57,8 @@
     dim: 42,
     blur: 0,
     doodles: true,
+    muteDoodleMusic: false,
+    doodleQuality: 'full',
     doodlePick: 'auto',
     doodleDate: '',
     engine: 'ddg',
@@ -84,6 +86,8 @@
     'dim',
     'blur',
     'doodles',
+    'muteDoodleMusic',
+    'doodleQuality',
     'doodlePick',
     'doodleDate',
     'engine',
@@ -145,10 +149,216 @@
     el.classList.add('pulse');
   };
 
+  const DHUES = [335, 195, 265, 45, 155];
+  let dateToneToken = 0;
+  let dateToneTimer = 0;
+  let lastBgSource = '';
+
+  const clampNumber = (value, min, max) => Math.min(max, Math.max(min, Number(value) || 0));
+
+  const rgbToHsl = (r, g, b) => {
+    r /= 255;
+    g /= 255;
+    b /= 255;
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    const delta = max - min;
+    const l = (max + min) / 2;
+    let h = 0;
+    let s = 0;
+    if (delta) {
+      s = delta / (1 - Math.abs(2 * l - 1));
+      if (max === r) h = ((g - b) / delta) % 6;
+      else if (max === g) h = (b - r) / delta + 2;
+      else h = (r - g) / delta + 4;
+      h *= 60;
+      if (h < 0) h += 360;
+    }
+    return [h, s * 100, l * 100];
+  };
+
+  const hslToRgb = (h, s, l) => {
+    h = ((h % 360) + 360) % 360;
+    s /= 100;
+    l /= 100;
+    const c = (1 - Math.abs(2 * l - 1)) * s;
+    const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+    const m = l - c / 2;
+    let parts;
+    if (h < 60) parts = [c, x, 0];
+    else if (h < 120) parts = [x, c, 0];
+    else if (h < 180) parts = [0, c, x];
+    else if (h < 240) parts = [0, x, c];
+    else if (h < 300) parts = [x, 0, c];
+    else parts = [c, 0, x];
+    return parts.map((part) => (part + m) * 255);
+  };
+
+  const hueDistance = (a, b) => {
+    const distance = Math.abs(a - b) % 360;
+    return Math.min(distance, 360 - distance);
+  };
+
+  const nearestCuteHue = (hue, saturation) => {
+    if (saturation < 8) return DHUES[1];
+    return DHUES.reduce((best, candidate) =>
+      hueDistance(hue, candidate) < hueDistance(hue, best) ? candidate : best, DHUES[0]);
+  };
+
+  const relativeLuminance = (r, g, b) => {
+    const channel = (value) => {
+      value /= 255;
+      return value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+    };
+    return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
+  };
+
+  const setDateVars = (hue, lightText) => {
+    const root = document.documentElement;
+    const chip = hslToRgb(hue, 72, lightText ? 72 : 58).map(Math.round);
+    const textLightness = lightText ? 86 : 34;
+    const accentLightness = lightText ? 73 : 48;
+    root.style.setProperty('--date-color', `hsl(${hue} 74% ${textLightness}%)`);
+    root.style.setProperty('--date-accent', `hsl(${hue} 82% ${accentLightness}%)`);
+    root.style.setProperty('--date-chip-rgb', chip.join(', '));
+    root.dataset.dateTone = lightText ? 'light' : 'dark';
+  };
+
+  const applyDateTone = (rgb) => {
+    const [r, g, b] = rgb.map((value) => clampNumber(value, 0, 255));
+    const [hue, saturation] = rgbToHsl(r, g, b);
+    const cute = nearestCuteHue(hue, saturation);
+    setDateVars(cute, relativeLuminance(r, g, b) < 0.42);
+  };
+
+  const applyFallbackTone = (seed) => {
+    let hash = 2166136261;
+    for (const character of String(seed || '')) {
+      hash ^= character.charCodeAt(0);
+      hash = Math.imul(hash, 16777619);
+    }
+    setDateVars(DHUES[(hash >>> 0) % DHUES.length], true);
+  };
+
+  const resetDateTone = () => {
+    const root = document.documentElement;
+    for (const name of ['--date-color', '--date-accent', '--date-chip-rgb']) {
+      root.style.removeProperty(name);
+    }
+    delete root.dataset.dateTone;
+  };
+
+  const fetchImageBlob = async (url) => {
+    if (/^(blob|data):/i.test(url)) {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`http ${response.status}`);
+      return response.blob();
+    }
+    try {
+      const result = await ext.runtime.sendMessage({ type: 'mew-fetch-bytes', url });
+      if (result && result.ok && result.buffer) {
+        return new Blob([result.buffer], { type: result.contentType || 'image/jpeg' });
+      }
+    } catch {}
+    const response = await fetch(url, {
+      credentials: 'omit',
+      cache: 'force-cache',
+      referrerPolicy: 'no-referrer',
+    });
+    if (!response.ok) throw new Error(`http ${response.status}`);
+    return response.blob();
+  };
+
+  const toBitmap = async (blob) => {
+    if (typeof createImageBitmap === 'function') return createImageBitmap(blob);
+    const objectUrl = URL.createObjectURL(blob);
+    try {
+      const image = new Image();
+      image.decoding = 'async';
+      image.src = objectUrl;
+      await image.decode();
+      return image;
+    } finally {
+      URL.revokeObjectURL(objectUrl);
+    }
+  };
+
+  const sampleBitmapAtDate = async (bitmap) => {
+    const rect = $('#date')?.getBoundingClientRect();
+    const width = bitmap.naturalWidth || bitmap.width;
+    const height = bitmap.naturalHeight || bitmap.height;
+    if (!rect || !width || !height) return [242, 198, 222];
+    const vw = window.innerWidth || 1;
+    const vh = window.innerHeight || 1;
+    const insetX = vw * 0.06;
+    const insetY = vh * 0.06;
+    const boxW = vw * 1.12;
+    const boxH = vh * 1.12;
+    const scale = Math.max(boxW / width, boxH / height);
+    const offsetX = (boxW - width * scale) / 2;
+    const offsetY = (boxH - height * scale) / 2;
+    const pad = 28 + (Number(state.blur) || 0) * 2;
+    const toX = (x) => (x + insetX - offsetX) / scale;
+    const toY = (y) => (y + insetY - offsetY) / scale;
+    const sx = clampNumber(toX(rect.left - pad), 0, width - 1);
+    const sy = clampNumber(toY(rect.top - pad), 0, height - 1);
+    const ex = clampNumber(toX(rect.right + pad), sx + 1, width);
+    const ey = clampNumber(toY(rect.bottom + pad), sy + 1, height);
+    const canvas = document.createElement('canvas');
+    canvas.width = 14;
+    canvas.height = 6;
+    const context = canvas.getContext('2d', { willReadFrequently: true });
+    context.drawImage(bitmap, sx, sy, ex - sx, ey - sy, 0, 0, canvas.width, canvas.height);
+    const data = context.getImageData(0, 0, canvas.width, canvas.height).data;
+    let r = 0;
+    let g = 0;
+    let b = 0;
+    for (let index = 0; index < data.length; index += 4) {
+      r += data[index];
+      g += data[index + 1];
+      b += data[index + 2];
+    }
+    const count = data.length / 4;
+    const shade = 1 - (clampNumber(state.dim, 0, 80) / 100) * 0.55;
+    return [(r / count) * shade, (g / count) * shade, (b / count) * shade];
+  };
+
+  const updateDateTone = async (url, expectedToken = bgToken) => {
+    const token = ++dateToneToken;
+    if (!url) {
+      resetDateTone();
+      return;
+    }
+    try {
+      const blob = await fetchImageBlob(url);
+      const bitmap = await toBitmap(blob);
+      try {
+        if (token !== dateToneToken || expectedToken !== bgToken) return;
+        await new Promise((resolve) => requestAnimationFrame(() => resolve()));
+        const rgb = await sampleBitmapAtDate(bitmap);
+        if (token !== dateToneToken || expectedToken !== bgToken) return;
+        applyDateTone(rgb);
+      } finally {
+        if (typeof bitmap.close === 'function') bitmap.close();
+      }
+    } catch (error) {
+      console.warn('[mew tab] date tone failed', error);
+      if (token === dateToneToken) applyFallbackTone(url);
+    }
+  };
+
+  const queueDateTone = () => {
+    clearTimeout(dateToneTimer);
+    dateToneTimer = setTimeout(() => {
+      if (lastBgSource) updateDateTone(lastBgSource);
+    }, 140);
+  };
+
   const applyAppearance = () => {
     const root = document.documentElement;
     root.style.setProperty('--dim', String(Math.max(0, Math.min(100, Number(state.dim) || 0)) / 100));
     root.style.setProperty('--blur', `${Math.max(0, Math.min(30, Number(state.blur) || 0))}px`);
+    queueDateTone();
   };
 
   const applyCustomCss = () => {
@@ -187,6 +397,7 @@
     $$('.seg[data-hero-pos]').forEach((button) => {
       button.classList.toggle('active', button.dataset.heroPos === state.heroPos);
     });
+    queueDateTone();
   };
 
   const renderClockTick = () => {
@@ -387,6 +598,25 @@
     toast('engine added');
   };
 
+  const directUrl = (raw) => {
+    if (/\s/.test(raw)) return null;
+    if (/^[a-z][a-z\d+.-]*:\/\//i.test(raw)) {
+      try {
+        const url = new URL(raw);
+        if (url.protocol === 'http:' || url.protocol === 'https:') return url.href;
+      } catch (_) {}
+      return null;
+    }
+    try {
+      const url = new URL(`https://${raw}`);
+      if (url.protocol !== 'https:') return null;
+      if (url.hostname !== 'localhost' && !url.hostname.includes('.')) return null;
+      return url.href;
+    } catch (_) {
+      return null;
+    }
+  };
+
   const setupSearch = () => {
     fillEngineSelects();
     renderEngineList();
@@ -416,12 +646,9 @@
         $('#q').focus();
         return;
       }
-      if (/^https?:\/\//i.test(raw)) {
-        location.href = raw;
-        return;
-      }
-      if (/^[\w-]+(\.[\w-]+)+(\/\S*)?$/.test(raw)) {
-        location.href = `https://${raw}`;
+      const target = directUrl(raw);
+      if (target) {
+        location.href = target;
         return;
       }
       if (useBrowserSearch) {
@@ -450,6 +677,11 @@
     });
   };
 
+  const syncHalloweenReset = () => {
+    const button = $('#resetHalloween');
+    if (button) button.hidden = state.doodlePick !== 'halloween';
+  };
+
   const populateDoodlePick = () => {
     const select = $('#doodlePick');
     if (!select || !window.MEW_SEASONAL) return;
@@ -463,6 +695,7 @@
       select.value = 'auto';
       state.doodlePick = 'auto';
     }
+    syncHalloweenReset();
   };
 
   const populateDoodleDates = () => {
@@ -643,6 +876,16 @@
       saveLight().then(() => location.reload());
     });
 
+    $('#muteDoodleMusic').addEventListener('change', (event) => {
+      state.muteDoodleMusic = event.target.checked;
+      saveLight().then(() => location.reload());
+    });
+
+    $('#doodleQuality').addEventListener('change', (event) => {
+      state.doodleQuality = event.target.value;
+      saveLight().then(() => location.reload());
+    });
+
     $('#doodlePick').addEventListener('change', (event) => {
       state.doodlePick = event.target.value;
       state.doodles = true;
@@ -656,6 +899,16 @@
         state.doodleDate = event.target.value;
         state.doodles = true;
         saveLight().then(() => location.reload());
+      });
+    }
+
+    const resetHalloween = $('#resetHalloween');
+    if (resetHalloween) {
+      resetHalloween.addEventListener('click', () => {
+        try {
+          localStorage.removeItem('halloween_killed');
+        } catch {}
+        location.reload();
       });
     }
 
@@ -769,6 +1022,8 @@
     $('#dimVal').textContent = `${state.dim}%`;
     $('#blurVal').textContent = `${state.blur}px`;
     $('#doodlesOn').checked = Boolean(state.doodles);
+    $('#muteDoodleMusic').checked = Boolean(state.muteDoodleMusic);
+    $('#doodleQuality').value = ['low', 'normal', 'full'].includes(state.doodleQuality) ? state.doodleQuality : 'full';
     $('#doodlePick').value = state.doodlePick || 'auto';
     if ($('#doodleDate')) $('#doodleDate').value = state.doodleDate || '';
     if (!useBrowserSearch) {
@@ -990,6 +1245,8 @@
       document.body.classList.remove('fallback');
       bg.style.backgroundImage = `url("${String(url).replace(/"/g, '%22')}")`;
       bg.classList.add('show');
+      lastBgSource = url;
+      updateDateTone(url, token);
       if (item) renderAttr(item);
       else $('#attr').hidden = true;
     };
@@ -1024,27 +1281,21 @@
           paintDecoded(full, fullSrc);
         };
         full.onerror = () => {
-          if (token !== bgToken) return;
-          bg.classList.remove('show');
-          document.body.classList.add('fallback');
-          const attr = $('#attr');
-          attr.hidden = false;
-          attr.textContent = 'that one would not load :c';
+          if (token === bgToken) fallbackBackground('that one would not load :c');
         };
         full.src = fullSrc;
         return;
       }
-      bg.classList.remove('show');
-      document.body.classList.add('fallback');
-      const attr = $('#attr');
-      attr.hidden = false;
-      attr.textContent = 'that one would not load :c';
+      fallbackBackground('that one would not load :c');
     };
     img.src = src;
   };
 
   const fallbackBackground = (message) => {
     bgToken += 1;
+    dateToneToken += 1;
+    lastBgSource = '';
+    resetDateTone();
     $('#bg').classList.remove('show');
     document.body.classList.add('fallback');
     const attr = $('#attr');
@@ -1664,6 +1915,13 @@
     }
     applyAppearance();
     applyTheme();
+    window.addEventListener('resize', queueDateTone);
+    if (document.fonts?.ready?.then) document.fonts.ready.then(queueDateTone).catch(() => {});
+    const quality = ['low', 'normal', 'full'].includes(state.doodleQuality) ? state.doodleQuality : 'full';
+    window.MEW_DOODLE_QUALITY = quality;
+    window.MEW_DOODLE_MUSIC = !state.muteDoodleMusic;
+    window.MEW_LOW_END = quality === 'low';
+    window.MEW_MID_END = quality === 'normal';
     startSeasonalDoodles();
     setupSearch();
     setupSettings();

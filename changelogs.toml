@@ -1,0 +1,10 @@
+[[2026-11-27]]
+changelogtext = """
+# Added:
+- Doodle performance levels, so low-end PCs can keep seasonal doodles light without using more RAM
+- A mute doodle music tick if the music in certain doodles annoys you
+
+# Changed:
+- Typed URLs now go straight to the site instead of being searched
+- Date and AM/PM colors now follow the wallpaper in the background
+"""

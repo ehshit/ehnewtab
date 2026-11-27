@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Eh's New Tab",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Just a New Tab experience, simple, and nothing else",
   "icons": {
     "16": "img/broicon.png",

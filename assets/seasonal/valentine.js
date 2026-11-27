@@ -1,4 +1,8 @@
 (function () {
+  const QUALITY = window.MEW_DOODLE_QUALITY || 'full';
+  const LOW_END = QUALITY === 'low';
+  const MID_END = QUALITY === 'normal';
+
   const BASE = '/assets/seasonal/rosesarered/';
   const FADE_IN_MS = 70000;
   const ATTACK_THRESHOLD = 10;
@@ -51,7 +55,7 @@
     function attack(target) {
       if (attackRunning) return;
       attackRunning = true;
-      const rect = target.getBoundingClientRect();
+      let overlay = null;
 
       const attackImg = img.cloneNode(true);
       Object.assign(attackImg.style, {
@@ -68,25 +72,28 @@
       if (target.style.position === 'static') target.style.position = 'relative';
       target.appendChild(attackImg);
 
-      const overlay = document.createElement('img');
-      overlay.src = '/assets/deltarune/explosion.gif';
-      Object.assign(overlay.style, {
-        position: 'fixed',
-        left: `${rect.left + rect.width / 2}px`,
-        top: `${rect.top + rect.height / 2}px`,
-        width: '220px',
-        height: 'auto',
-        transform: 'translate(-50%, -50%)',
-        zIndex: '999999',
-        pointerEvents: 'none',
-        userSelect: 'none',
-      });
-      document.body.appendChild(overlay);
+      if (!MID_END) {
+        const rect = target.getBoundingClientRect();
+        overlay = document.createElement('img');
+        overlay.src = '/assets/deltarune/explosion.gif';
+        Object.assign(overlay.style, {
+          position: 'fixed',
+          left: `${rect.left + rect.width / 2}px`,
+          top: `${rect.top + rect.height / 2}px`,
+          width: '220px',
+          height: 'auto',
+          transform: 'translate(-50%, -50%)',
+          zIndex: '999999',
+          pointerEvents: 'none',
+          userSelect: 'none',
+        });
+        document.body.appendChild(overlay);
 
-      const audio = new Audio('/assets/deltarune/delexplosion.ogg');
-      audio.preload = 'auto';
-      audio.volume = 1;
-      audio.play().catch(() => {});
+        const audio = new Audio('/assets/deltarune/delexplosion.ogg');
+        audio.preload = 'auto';
+        audio.volume = 1;
+        audio.play().catch(() => {});
+      }
 
       const startPos = getComputedStyle(target).position;
       if (startPos === 'static') {
@@ -94,7 +101,7 @@
       }
       target.style.zIndex = '999997';
       target.style.transformOrigin = 'center center';
-      target.style.willChange = 'transform, opacity';
+      if (!MID_END) target.style.willChange = 'transform, opacity';
       target.style.transition = 'transform 2000ms cubic-bezier(0.12, 0.75, 0.15, 1), opacity 2000ms ease';
 
       const dx = (Math.random() * window.innerWidth * 0.8) - (window.innerWidth * 0.4);
@@ -110,22 +117,24 @@
       });
 
       setTimeout(() => {
-        overlay.remove();
+        if (overlay) overlay.remove();
         target.remove();
         attackRunning = false;
       }, ATTACK_MS);
     }
-    img.addEventListener('click', () => {
-      if (attackRunning) return;
-      if (!armed) {
-        armed = true;
-      }
-      clickCount += 1;
-      if (clickCount > ATTACK_THRESHOLD) {
-        const target = pickRandomDiv();
-        attack(target);
-      }
-    });
+    if (!LOW_END) {
+      img.addEventListener('click', () => {
+        if (attackRunning) return;
+        if (!armed) {
+          armed = true;
+        }
+        clickCount += 1;
+        if (clickCount > ATTACK_THRESHOLD) {
+          const target = pickRandomDiv();
+          attack(target);
+        }
+      });
+    }
     strip.appendChild(img);
     if (installBox) installBox.insertAdjacentElement('afterend', strip);
     else if (search) search.insertAdjacentElement('afterend', strip);

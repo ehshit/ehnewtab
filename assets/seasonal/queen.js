@@ -1,4 +1,8 @@
 (function () {
+  const QUALITY = window.MEW_DOODLE_QUALITY || 'full';
+  const LOW_END = QUALITY === 'low';
+  const MID_END = QUALITY === 'normal';
+
   function isQueenTime(d) {
     return d.getMonth() === 8 && d.getDate() === 21;
   }
@@ -44,8 +48,8 @@
     frameImages.queenstand.src = BASE + 'queenstand.png';
     const laughSfx = new Audio(BASE + 'snd_queen_laugh.ogg');
     const laugh1Sfx = new Audio(BASE + 'snd_queen_laugh1.ogg');
-    laughSfx.preload = 'auto';
-    laugh1Sfx.preload = 'auto';
+    laughSfx.preload = LOW_END ? 'none' : MID_END ? 'metadata' : 'auto';
+    laugh1Sfx.preload = LOW_END ? 'none' : MID_END ? 'metadata' : 'auto';
     let laughDuration = 2000;
     let laugh1Duration = 2000;
     laughSfx.addEventListener('loadedmetadata', () => {
@@ -72,16 +76,18 @@
     };
     let mouseX = 0;
     let mouseY = 0;
-    document.addEventListener('mousemove', (e) => {
-      mouseX = e.clientX;
-      mouseY = e.clientY;
-    });
-    document.addEventListener('touchmove', (e) => {
-      if (e.touches && e.touches.length > 0) {
-        mouseX = e.touches[0].clientX;
-        mouseY = e.touches[0].clientY;
-      }
-    });
+    if (QUALITY === 'full') {
+      document.addEventListener('mousemove', (e) => {
+        mouseX = e.clientX;
+        mouseY = e.clientY;
+      });
+      document.addEventListener('touchmove', (e) => {
+        if (e.touches && e.touches.length > 0) {
+          mouseX = e.touches[0].clientX;
+          mouseY = e.touches[0].clientY;
+        }
+      });
+    }
     function resize() {
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
@@ -196,18 +202,24 @@
     }
     let lastTime = performance.now();
     let accumulator = 0;
-    const STEP = 1000 / 60;
+    const STEP = 1000 / (LOW_END ? 30 : MID_END ? 45 : 60);
     function loop(time) {
       requestAnimationFrame(loop);
-     
+      if (document.hidden) {
+        lastTime = time;
+        return;
+      }
+
       const dt = Math.min(time - lastTime, 100);
       lastTime = time;
       accumulator += dt;
+      let updated = false;
       while (accumulator >= STEP) {
         update();
         accumulator -= STEP;
+        updated = true;
       }
-      draw();
+      if (updated || QUALITY === 'full') draw();
     }
     const interceptEvents = ['mousedown', 'touchstart'];
     interceptEvents.forEach(type => {

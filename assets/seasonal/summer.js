@@ -1,4 +1,9 @@
 (function () {
+  const QUALITY = window.MEW_DOODLE_QUALITY || 'full';
+  const MUSIC = window.MEW_DOODLE_MUSIC !== false;
+  const LOW_END = QUALITY === 'low';
+  const MID_END = QUALITY === 'normal';
+
   const BASE = '/assets/seasonal/summer/';
 
   function isSummer(d) {
@@ -45,8 +50,8 @@
     const img1 = new Image();
 
     const harp = new Audio(BASE + 'mus_harpnoise.ogg');
-    const mus = new Audio(BASE + 'mus_options_summer.ogg');
-    mus.loop = true;
+    const mus = (LOW_END || !MUSIC) ? null : new Audio(BASE + 'mus_options_summer.ogg');
+    if (mus) mus.loop = true;
 
     let extreme = 0;
     let extreme2 = 0;
@@ -92,6 +97,7 @@
     }
 
     harp.addEventListener('ended', () => {
+        if (!mus) return;
         mus.play();
     });
 
@@ -112,11 +118,30 @@
 
     const translateX = useLeft ? 130 : 170;
 
-    function loop() {
+    const FRAME_MS = LOW_END ? 100 : MID_END ? 50 : 0;
+    let lastFrame = 0;
+    let rafId = 0;
+
+    function schedule() {
+        if (document.hidden) return;
+        rafId = requestAnimationFrame(loop);
+    }
+
+    function loop(timestamp) {
+        if (document.hidden) {
+            rafId = 0;
+            return;
+        }
+        if (FRAME_MS && timestamp - lastFrame < FRAME_MS) {
+            schedule();
+            return;
+        }
+        lastFrame = timestamp;
+
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
         if (!imagesLoaded) {
-            requestAnimationFrame(loop);
+            schedule();
             return;
         }
 
@@ -147,10 +172,20 @@
             ctx.restore();
         }
 
-        requestAnimationFrame(loop);
+        schedule();
     }
 
-    requestAnimationFrame(loop);
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+            if (rafId) cancelAnimationFrame(rafId);
+            rafId = 0;
+        } else {
+            lastFrame = 0;
+            schedule();
+        }
+    });
+
+    schedule();
   }
 
   const now = window.MEW_FORCE_DATE ? new Date(window.MEW_FORCE_DATE) : new Date();

@@ -78,6 +78,10 @@
   --dim: 0.42;
   --blur: 0px;
 
+  --date-color: #f2c6de;
+  --date-accent: #d494b7;
+  --date-chip-rgb: 242, 198, 222;
+
   --panel: rgba(22, 22, 22, 0.82);
   --panel-strong: rgba(15, 15, 15, 0.94);
   --shadow: 0 18px 60px rgba(0, 0, 0, 0.5);
@@ -376,24 +380,21 @@ a {
 .clock .ampm {
   margin-left: 0.3em;
   vertical-align: super;
-  font-size: 0.22em;
+  font-size: 0.24em;
   font-weight: 600;
   letter-spacing: 0.08em;
-  color: var(--text-dim);
+  color: var(--date-color, var(--text));
 }
 
 .date {
   margin-top: 0.9rem;
+  color: var(--date-color);
   font-family: var(--font-mono);
   font-size: 0.72rem;
+  font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  color: #6F848A;
-}
-
-.date::before {
-  content: "· ";
-  color: var(--pink-mid);
+  transition: color 500ms ease;
 }
 
 .search {
@@ -1141,11 +1142,7 @@ html[data-theme="material2"] .clock .colon {
 
 html[data-theme="material2"] .clock .ampm {
   font-weight: 400;
-  color: var(--text-dim);
-}
-
-html[data-theme="material2"] .date::before {
-  color: var(--pink);
+  color: var(--date-color, var(--text));
 }
 
 html[data-theme="material2"] .search {

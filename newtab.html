@@ -154,7 +154,7 @@
 .hero { gap: 2rem; }
 .search { border-color: var(--pink-mid); }
 :root { --dim: 0.55; }</pre>
-            <p><code>variables:</code> --text, --text-dim, --text-muted, --bg, --bg-alt, --border, --border-hi, --pink, --pink-mid, --blue, --mint, --purple, --yellow, --cream, --font-syne, --font-mono, --radius, --radius-sm, --scrim-rgb</p>
+            <p><code>variables:</code> --text, --text-dim, --text-muted, --bg, --bg-alt, --border, --border-hi, --pink, --pink-mid, --blue, --mint, --purple, --yellow, --cream, --font-syne, --font-mono, --radius, --radius-sm, --scrim-rgb, --date-color, --date-accent, --date-chip-rgb</p>
             <p><code>classes:</code> .topbar .brand .navlink .shell .hero .clock-block .clock .date .search .engine .engine-display .q .go .attr .settings .settings-tab .settings-pane .panel-treatment .seg .btn .hint .toast</p>
             <p>search position is exposed as <code>html[data-search-pos="center"]</code> or <code>html[data-search-pos="non-center"]</code>; clock position as <code>html[data-clock-pos="center"]</code> or <code>html[data-clock-pos="non-center"]</code>; box position as <code>html[data-hero-pos="center"]</code> or <code>html[data-hero-pos="non-center"]</code>.</p>
           </details>
@@ -247,12 +247,22 @@
       <section>
         <h3>doodles</h3>
         <label class="check"><input id="doodlesOn" type="checkbox"> activate seasonal doodles</label>
+        <label class="check"><input id="muteDoodleMusic" type="checkbox"> mute doodle music</label>
+        <label>doodle performance
+          <select id="doodleQuality">
+            <option value="low">low</option>
+            <option value="normal">normal</option>
+            <option value="full">full</option>
+          </select>
+        </label>
+        <p class="hint">Use this when it feels like one of the doodles is laggy or lagging your computer</p>
         <label>what doodle to be
           <select id="doodlePick"></select>
         </label>
         <label id="doodleDateWrap" hidden>simulated date
           <select id="doodleDate"></select>
         </label>
+        <button id="resetHalloween" class="btn ghost" type="button" hidden>Reset Halloween</button>
         <p class="hint">setting to Auto (by date) will follow your system's calendar</p>
       </section>
     </div>

@@ -31,6 +31,8 @@ jobs:
             --exclude='dist' \
             --exclude='manifest_chrome.json' \
             --exclude='build.json' \
+            --exclude='changelogs.toml' \
+            --exclude='amo-metadata.json' \
             --exclude='.gitignore' \
             ./ dist/firefox/
           printf 'globalThis.EH_BROWSER_SEARCH = false;\n' > dist/firefox/js/build-config.js
@@ -60,12 +62,42 @@ jobs:
             exit 1
           fi
           mkdir -p dist/signed
+          rm -f amo-metadata.json
+          python3 - <<'PY'
+          import json, sys
+          try:
+              import tomllib
+              with open("changelogs.toml", "rb") as f:
+                  data = tomllib.load(f)
+              for date in sorted(data, reverse=True)[:1]:
+                  blocks = data[date]
+                  if isinstance(blocks, dict):
+                      blocks = [blocks]
+                  pieces = []
+                  for block in blocks:
+                      text = block.get("changelogtext", "").strip()
+                      if text:
+                          pieces.append(date + "\n\n" + text)
+              text = "\n\n".join(pieces)
+              if text:
+                  with open("amo-metadata.json", "w", encoding="utf-8") as f:
+                      json.dump({"version": {"release_notes": {"en-US": text}}}, f, ensure_ascii=False)
+          except FileNotFoundError:
+              print("no changelogs.toml, signing without release notes", file=sys.stderr)
+          except Exception as e:
+              print("could not read changelogs.toml: " + str(e), file=sys.stderr)
+          PY
+          sign_args=()
+          if [[ -f amo-metadata.json ]]; then
+            sign_args+=(--amo-metadata amo-metadata.json)
+          fi
           npx --yes web-ext@latest sign \
             --source-dir dist/firefox \
             --artifacts-dir dist/signed \
-            --channel unlisted \
+            --channel listed \
             --api-key "$WEB_EXT_API_KEY" \
             --api-secret "$WEB_EXT_API_SECRET" \
+            "${sign_args[@]}" \
             --no-input
           VERSION=$(jq -r '.version' dist/firefox/manifest.json)
           mv dist/signed/*.xpi "dist/${SLUG}-firefox-${VERSION}.xpi"
@@ -99,6 +131,8 @@ jobs:
               --exclude='manifest.json' \
               --exclude='manifest_chrome.json' \
               --exclude='build.json' \
+              --exclude='changelogs.toml' \
+              --exclude='amo-metadata.json' \
               --exclude='.gitignore' \
               ./ "$target/"
             cp manifest_chrome.json "$target/manifest.json"
@@ -132,24 +166,56 @@ jobs:
         run: |
           VERSION=$(jq -r '.version' dist/firefox/manifest.json)
           BASE="https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}"
-          cat > release-notes.md <<EOF
-          > [!NOTE]
-          > If you install it via the Firefox / Chrome Addons stores it might take a while for them to approve it.
+          export VERSION BASE
+          python3 - <<'PY'
+          import os, sys
 
-          New version new stuff!
+          version = os.environ["VERSION"]
+          base = os.environ["BASE"]
+          out = []
 
-          ### Firefox
-          | build | download |
-          | --- | --- |
-          | zip | [ehs-new-tab-firefox-${VERSION}.zip](${BASE}/ehs-new-tab-firefox-${VERSION}.zip) |
-          | signed xpi | [ehs-new-tab-firefox-${VERSION}.xpi](${BASE}/ehs-new-tab-firefox-${VERSION}.xpi) |
+          try:
+              import tomllib
+              with open("changelogs.toml", "rb") as f:
+                  data = tomllib.load(f)
+              for date in sorted(data, reverse=True)[:1]:
+                  blocks = data[date]
+                  if isinstance(blocks, dict):
+                      blocks = [blocks]
+                  for block in blocks:
+                      text = block.get("changelogtext", "").strip()
+                      if text:
+                          out.append("**" + date + "**\n\n" + text)
+          except FileNotFoundError:
+              print("no changelogs.toml, publishing without one", file=sys.stderr)
+          except Exception as e:
+              print("could not read changelogs.toml: " + str(e), file=sys.stderr)
 
-          ### Chrome
-          | variant | download |
-          | --- | --- |
-          | forced (store-compliant) | [ehs-new-tab-chrome-${VERSION}-forced.zip](${BASE}/ehs-new-tab-chrome-${VERSION}-forced.zip) |
-          | unlocked (sideload) | [ehs-new-tab-chrome-${VERSION}-unlocked.zip](${BASE}/ehs-new-tab-chrome-${VERSION}-unlocked.zip) |
-          EOF
+          if out:
+              out.insert(0, "## Changelog")
+
+          out.append(
+              "> [!NOTE]\n"
+              "> If you install it via the Firefox / Chrome Addons stores it might take a while for them to approve it."
+          )
+          out.append(
+              "### Firefox\n\n"
+              "| build | download |\n"
+              "| --- | --- |\n"
+              f"| zip | [ehs-new-tab-firefox-{version}.zip]({base}/ehs-new-tab-firefox-{version}.zip) |\n"
+              f"| signed xpi | [ehs-new-tab-firefox-{version}.xpi]({base}/ehs-new-tab-firefox-{version}.xpi) |"
+          )
+          out.append(
+              "### Chrome\n\n"
+              "| variant | download |\n"
+              "| --- | --- |\n"
+              f"| forced (store-compliant) | [ehs-new-tab-chrome-{version}-forced.zip]({base}/ehs-new-tab-chrome-{version}-forced.zip) |\n"
+              f"| unlocked (sideload) | [ehs-new-tab-chrome-{version}-unlocked.zip]({base}/ehs-new-tab-chrome-{version}-unlocked.zip) |"
+          )
+
+          with open("release-notes.md", "w", encoding="utf-8") as f:
+              f.write("\n\n".join(out) + "\n")
+          PY
 
       - uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/v')

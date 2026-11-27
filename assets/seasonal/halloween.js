@@ -1,5 +1,9 @@
 (function () {
   const BASE = '/assets/deltarune/';
+  const QUALITY = window.MEW_DOODLE_QUALITY || 'full';
+  const MUSIC = window.MEW_DOODLE_MUSIC !== false;
+  const LOW_END = QUALITY === 'low';
+  const MID_END = QUALITY === 'normal';
   const STORAGE_KEY = 'halloween_killed';
   const PUMPKIN_W = 57;
   const PUMPKIN_H = 65;
@@ -16,8 +20,8 @@
     document.documentElement.style.overflowX = 'hidden';
     document.body.style.overflowX = 'hidden';
 
-    const music = new Audio(BASE + 'pumpkin_boss.ogg');
-    music.loop = true;
+    const music = MUSIC ? new Audio(BASE + 'pumpkin_boss.ogg') : null;
+    if (music) music.loop = !LOW_END;
 
     let musicStarted = false;
     let dead = false;
@@ -32,7 +36,8 @@
     const vh = document.documentElement.clientHeight;
     const isDesktop = vw >= 768 && vh >= 500;
     const walkSpeed = Math.max(0.05, vw / 35000);
-    const interval = Math.round((PUMPKIN_W + GAP) / walkSpeed);
+    const interval = Math.round((PUMPKIN_W + GAP) / walkSpeed) * (LOW_END ? 2 : MID_END ? 1.5 : 1);
+    const maxPumpkins = LOW_END ? 6 : MID_END ? 12 : Infinity;
 
     function startBottomTimer() {
       if (dead || bottomTimer) return;
@@ -66,7 +71,7 @@
     });
 
     function spawnPumpkin(isTop) {
-      if (dead) return;
+      if (dead || activePumpkins.length >= maxPumpkins) return;
 
       const img = document.createElement('img');
       img.src = BASE + 'jackenstein.gif';
@@ -132,7 +137,7 @@
     }
 
     function tryUnlockTop() {
-      if (topUnlocked || !isDesktop) return;
+      if (LOW_END || topUnlocked || !isDesktop) return;
       const chance = 1 - Math.pow(0.995, spawnCount);
       if (Math.random() < chance) {
         topUnlocked = true;
@@ -143,7 +148,7 @@
 
     function onPumpkinClick() {
       if (dead) return;
-      if (!musicStarted) {
+      if (music && !musicStarted) {
         music.currentTime = 0;
         music.play().catch(() => {});
         musicStarted = true;
@@ -156,18 +161,22 @@
       dead = true;
       stopTimers();
 
-      music.pause();
-      music.currentTime = 0;
+      if (music) {
+        music.pause();
+        music.currentTime = 0;
+      }
 
       activePumpkins.forEach(({ el, cancel }) => {
         cancel();
-        const canvas = document.createElement('canvas');
-        canvas.width = PUMPKIN_W;
-        canvas.height = PUMPKIN_H;
-        try {
-          canvas.getContext('2d').drawImage(el, 0, 0, PUMPKIN_W, PUMPKIN_H);
-          el.src = canvas.toDataURL('image/png');
-        } catch (e) {}
+        if (QUALITY === 'full') {
+          const canvas = document.createElement('canvas');
+          canvas.width = PUMPKIN_W;
+          canvas.height = PUMPKIN_H;
+          try {
+            canvas.getContext('2d').drawImage(el, 0, 0, PUMPKIN_W, PUMPKIN_H);
+            el.src = canvas.toDataURL('image/png');
+          } catch (e) {}
+        }
       });
 
       setTimeout(() => {
@@ -178,14 +187,16 @@
 
         const showBoom = () => {
           const boom = document.createElement('img');
-          boom.src = BASE + 'explosionlong.gif?t=' + Date.now();
+          boom.src = QUALITY === 'full'
+            ? BASE + 'explosionlong.gif?t=' + Date.now()
+            : BASE + 'explosionlong.gif';
           Object.assign(boom.style, {
             position:       'fixed',
             top:            '50%',
             left:           '50%',
             transform:      'translate(-50%, -50%)',
-            minWidth:       '100vw',
-            minHeight:      '100vh',
+            minWidth:       LOW_END ? '300px' : MID_END ? '70vw' : '100vw',
+            minHeight:      LOW_END ? '300px' : MID_END ? '70vh' : '100vh',
             width:          'auto',
             height:         'auto',
             zIndex:         '99999',

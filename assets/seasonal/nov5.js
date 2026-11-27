@@ -1,4 +1,8 @@
 (function () {
+  const QUALITY = window.MEW_DOODLE_QUALITY || 'full';
+  const LOW_END = QUALITY === 'low';
+  const MID_END = QUALITY === 'normal';
+
   function isNov510(d) { return d.getMonth() === 10 && d.getDate() >= 5 && d.getDate() <= 10; }
   function isSnowDay(d) { return d.getMonth() === 10 && d.getDate() >= 8 && d.getDate() <= 10; }
 
@@ -6,6 +10,7 @@
   let _xmasResizeBound = false;
 
   function initLights() {
+    if (LOW_END) return;
     const colors = ['#ff3b3b','#ffdd00','#3bff6e','#3bb5ff','#ff3bff','#ff8c00'];
 
     const build = () => {
@@ -59,7 +64,7 @@
           width:12px;
           height:16px;
           border-radius:50% 50% 50% 50%/60% 60% 40% 40%;
-          animation:glow 1.5s infinite alternate;
+          ${MID_END ? '' : 'animation:glow 1.5s infinite alternate;'}
         }
         @keyframes glow{
           from{filter:brightness(0.7);}
@@ -74,7 +79,7 @@
         const li = document.createElement('li');
         const span = document.createElement('span');
         const color = colors[i % colors.length];
-        span.style.cssText = `background:${color};color:${color};animation-delay:${(i * 0.15) % 1.5}s`;
+        span.style.cssText = `background:${color};color:${color};${MID_END ? '' : `animation-delay:${(i * 0.15) % 1.5}s`}`;
         li.appendChild(span);
         ul.appendChild(li);
       }
@@ -92,9 +97,21 @@
   }
 
   function initSnow() {
+    if (LOW_END) return;
     const script = document.createElement('script');
     script.src = '/assets/seasonal/snowflakes.js';
-    script.onload = () => new Snowflakes({ color:'#ffffff',count:50,minSize:8,maxSize:20,speed:1.0,wind:true,rotation:true,minOpacity:0.4,maxOpacity:0.9,zIndex:9000 });
+    script.onload = () => new Snowflakes({
+      color: '#ffffff',
+      count: MID_END ? 16 : 50,
+      minSize: MID_END ? 6 : 8,
+      maxSize: MID_END ? 14 : 20,
+      speed: MID_END ? 0.8 : 1.0,
+      wind: !MID_END,
+      rotation: !MID_END,
+      minOpacity: 0.4,
+      maxOpacity: 0.9,
+      zIndex: 9000,
+    });
     document.head.appendChild(script);
   }
 
@@ -117,9 +134,9 @@
 
   function run(d) {
     if (!isNov510(d)) return;
-    initLights();
-    initSnowball();
-    if (isSnowDay(d)) initSnow();
+    if (!LOW_END) initLights();
+    if (!LOW_END) initSnowball();
+    if (!LOW_END && isSnowDay(d)) initSnow();
   }
 
   const now = window.MEW_FORCE_DATE ? new Date(window.MEW_FORCE_DATE) : new Date();

@@ -1,5 +1,9 @@
 (function () {
   const BASE = '/assets/seasonal/newyear/';
+  const QUALITY = window.MEW_DOODLE_QUALITY || 'full';
+  const MUSIC = window.MEW_DOODLE_MUSIC !== false;
+  const LOW_END = QUALITY === 'low';
+  const MID_END = QUALITY === 'normal';
   const _t = (key, vars, fallback) => window.i18n ? (window.i18n.t(key, vars) || fallback) : fallback;
 
   function isSnowSeason(d) {
@@ -12,7 +16,7 @@
   }
 
   function isCountdownVisible(d) {
-    return (d.getMonth() === 11 && d.getDate() >= 27) ||
+    return (d.getMonth() === 11 && d.getDate() >= 23) ||
            (d.getMonth() === 0  && d.getDate() <= 4);
   }
 
@@ -24,6 +28,7 @@
   let _xmasResizeBound = false;
 
   function initLights() {
+    if (LOW_END) return;
     const colors = ['#ff3b3b','#ffdd00','#3bff6e','#3bb5ff','#ff3bff','#ff8c00'];
 
     const build = () => {
@@ -77,7 +82,7 @@
           width:12px;
           height:16px;
           border-radius:50% 50% 50% 50%/60% 60% 40% 40%;
-          animation:xglow 1.5s infinite alternate;
+          ${MID_END ? '' : 'animation:xglow 1.5s infinite alternate;'}
         }
         @keyframes xglow{
           from{filter:brightness(0.7);}
@@ -92,7 +97,7 @@
         const li = document.createElement('li');
         const span = document.createElement('span');
         const color = colors[i % colors.length];
-        span.style.cssText = `background:${color};color:${color};animation-delay:${(i * 0.15) % 1.5}s`;
+        span.style.cssText = `background:${color};color:${color};${MID_END ? '' : `animation-delay:${(i * 0.15) % 1.5}s`}`;
         li.appendChild(span);
         ul.appendChild(li);
       }
@@ -112,6 +117,7 @@
   let _snowMusic = null;
 
   function initSnowMusic(d) {
+    if (!MUSIC) return;
     const track = isNewYear(d) ? 'themejan1.mp3'
       : (Math.random() < 0.12 ? 'themealt2.mp3' : 'theme.mp3');
     _snowMusic = new Audio(BASE + track);
@@ -124,14 +130,15 @@
   }
 
   function initSnow(d) {
+    if (LOW_END) return;
     const script = document.createElement('script');
     script.src = '/assets/seasonal/snowflakes.js';
     script.onload = () => {
       new Snowflakes({
-        color: '#ffffff', count: 60,
-        minSize: 8, maxSize: 22,
-        speed: 1.2, wind: true,
-        rotation: true, minOpacity: 0.4,
+        color: '#ffffff', count: MID_END ? 24 : 60,
+        minSize: MID_END ? 7 : 8, maxSize: MID_END ? 16 : 22,
+        speed: MID_END ? 1 : 1.2, wind: !MID_END,
+        rotation: !MID_END, minOpacity: 0.4,
         maxOpacity: 0.9, zIndex: 8000,
       });
       initSnowMusic(d);
@@ -155,9 +162,12 @@
     document.body.appendChild(overlay);
 
     const showGifs = () => {
-      for (let i = 0; i < 18; i++) {
+      const count = LOW_END ? 0 : MID_END ? 4 : 18;
+      for (let i = 0; i < count; i++) {
         const img = document.createElement('img');
-        img.src = BASE + 'happynewyear.gif?t=' + Date.now() + i;
+        img.src = QUALITY === 'full'
+          ? BASE + 'happynewyear.gif?t=' + Date.now() + i
+          : BASE + 'happynewyear.gif';
         Object.assign(img.style, {
           position: 'fixed', width: '280px',
           left: Math.random() * (window.innerWidth - 280) + 'px',
@@ -173,10 +183,12 @@
     sfx.addEventListener('ended', () => {
       overlay.remove();
       if (strip) strip.innerHTML = `<span>${_t('christmas.message', { year }, `🎉 Happy New Year ${year}!`)}</span>`;
-      const jan1music = new Audio(BASE + 'themejan1.mp3');
-      jan1music.loop = true; jan1music.volume = 0.5;
-      jan1music.play().catch(() => {});
-      _snowMusic = jan1music;
+      if (MUSIC) {
+        const jan1music = new Audio(BASE + 'themejan1.mp3');
+        jan1music.loop = true; jan1music.volume = 0.5;
+        jan1music.play().catch(() => {});
+        _snowMusic = jan1music;
+      }
     }, { once: true });
 
     sfx.play().catch(() => {
@@ -221,12 +233,12 @@
         if (diff <= 0) { if (!fired) { fired = true; clock.textContent = _t('christmas.zero', null, '🎉 00:00:00'); triggerNewYear(strip); } return; }
         const h = Math.floor(diff / 3600000), m = Math.floor((diff % 3600000) / 60000), s = Math.floor((diff % 60000) / 1000);
         clock.textContent = '🎄 ' + String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
-        setTimeout(tick, 500);
+        setTimeout(tick, LOW_END ? 1000 : 500);
       }
       tick(); return;
     }
 
-    if (d.getMonth() === 11 && d.getDate() >= 27) {
+    if (d.getMonth() === 11 && d.getDate() >= 23) {
       const target = getNextNewYear(d);
       const clock = document.createElement('span');
       strip.appendChild(clock);
@@ -238,7 +250,7 @@
         clock.textContent = days > 0
           ? `🎄 ${days}d ${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`
           : `🎄 ${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
-        setTimeout(tick, 500);
+        setTimeout(tick, LOW_END ? 1000 : 500);
       }
       tick(); return;
     }
@@ -257,8 +269,8 @@ function initTree() {
         width:170px; height:auto;
         z-index:9000; pointer-events:none;
         transform-origin:bottom center;
-        animation:xtsway 6s ease-in-out infinite;
-        filter:drop-shadow(0 10px 14px rgba(0,0,0,0.35));
+        ${LOW_END ? '' : 'animation:xtsway 6s ease-in-out infinite;'}
+        ${LOW_END || MID_END ? '' : 'filter:drop-shadow(0 10px 14px rgba(0,0,0,0.35));'}
       }
       #xmas-tree img{ display:block; width:100%; height:auto; }
       @keyframes xtsway{ 0%,100%{transform:rotate(-1deg);} 50%{transform:rotate(1deg);} }
@@ -298,7 +310,7 @@ function initTree() {
       width: 'clamp(48px, 5.5vw, 78px)',
       height: 'auto',
       transform: 'translate(-50%, -100%)',
-      filter: 'drop-shadow(0 10px 18px rgba(0, 0, 0, 0.35))',
+      filter: LOW_END || MID_END ? 'none' : 'drop-shadow(0 10px 18px rgba(0, 0, 0, 0.35))',
     });
     img.addEventListener('load', positionHat, { once: true });
     block.appendChild(img);
@@ -344,7 +356,7 @@ function initTree() {
     }
 
     const clockEl = document.querySelector('.clock');
-    if (clockEl) {
+    if (clockEl && QUALITY === 'full') {
       const observer = new MutationObserver(positionHat);
       observer.observe(clockEl, { childList: true, subtree: false });
       window.addEventListener('resize', positionHat);

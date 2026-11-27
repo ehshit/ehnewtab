@@ -1,4 +1,8 @@
 (function () {
+  const QUALITY = window.MEW_DOODLE_QUALITY || 'full';
+  const LOW_END = QUALITY === 'low';
+  const MID_END = QUALITY === 'normal';
+
   function isLancerTime(d) {
     return d.getMonth() === 8 && d.getDate() >= 8 && d.getDate() <= 14;
   }
@@ -330,24 +334,34 @@
 
     let lastTime = performance.now();
     let accumulator = 0;
-    const STEP = 1000 / 60;
+    const STEP = 1000 / (LOW_END ? 30 : MID_END ? 45 : 60);
 
     function loop(time) {
       requestAnimationFrame(loop);
-      
+      if (document.hidden) {
+        lastTime = time;
+        return;
+      }
+
       const dt = Math.min(time - lastTime, 100);
       lastTime = time;
       accumulator += dt;
 
+      let updated = false;
       while (accumulator >= STEP) {
         update();
         accumulator -= STEP;
+        updated = true;
       }
 
-      draw();
+      if (updated || QUALITY === 'full') draw();
     }
 
-    const interceptEvents = ['mousedown', 'mouseup', 'click', 'dblclick', 'touchstart', 'touchend'];
+    const interceptEvents = LOW_END
+      ? ['mousedown', 'touchstart']
+      : MID_END
+        ? ['mousedown', 'click', 'touchstart']
+        : ['mousedown', 'mouseup', 'click', 'dblclick', 'touchstart', 'touchend'];
 
     interceptEvents.forEach(type => {
       window.addEventListener(type, (e) => {
