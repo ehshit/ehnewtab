@@ -64,7 +64,7 @@ jobs:
           mkdir -p dist/signed
           rm -f amo-metadata.json
           python3 - <<'PY'
-          import json, sys
+          import json, re, sys
           try:
               import tomllib
               with open("changelogs.toml", "rb") as f:
@@ -76,6 +76,7 @@ jobs:
                   pieces = []
                   for block in blocks:
                       text = block.get("changelogtext", "").strip()
+                      text = re.sub(r"(?m)^#+\s*", "", text)
                       if text:
                           pieces.append(date + "\n\n" + text)
               text = "\n\n".join(pieces)
@@ -168,11 +169,12 @@ jobs:
           BASE="https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}"
           export VERSION BASE
           python3 - <<'PY'
-          import os, sys
+          import os, re, sys
 
           version = os.environ["VERSION"]
           base = os.environ["BASE"]
           out = []
+          changelog = []
 
           try:
               import tomllib
@@ -184,20 +186,22 @@ jobs:
                       blocks = [blocks]
                   for block in blocks:
                       text = block.get("changelogtext", "").strip()
+                      text = re.sub(r"(?m)^#+\s*", "", text)
                       if text:
-                          out.append("**" + date + "**\n\n" + text)
+                          changelog.append("**" + date + "**\n\n" + text)
           except FileNotFoundError:
               print("no changelogs.toml, publishing without one", file=sys.stderr)
           except Exception as e:
               print("could not read changelogs.toml: " + str(e), file=sys.stderr)
 
-          if out:
-              out.insert(0, "## Changelog")
-
           out.append(
               "> [!NOTE]\n"
               "> If you install it via the Firefox / Chrome Addons stores it might take a while for them to approve it."
           )
+
+          if changelog:
+              out.append("## Changelog")
+              out.extend(changelog)
           out.append(
               "### Firefox\n\n"
               "| build | download |\n"
